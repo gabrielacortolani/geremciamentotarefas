@@ -5,12 +5,16 @@ import com.gerenciamentotarefa.model.entity.Tarefa;
 import com.gerenciamentotarefa.model.enums.Status;
 import com.gerenciamentotarefa.repository.TarefaRepository;
 import com.gerenciamentotarefa.service.TarefaService;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class TarefaServiceImpl implements TarefaService {
@@ -38,20 +42,23 @@ public class TarefaServiceImpl implements TarefaService {
 
     @Override
     public Tarefa finalizarTarefa(Long id) {
-        Tarefa tarefa = repository.findById(id)
-                .orElseThrow(() -> new RegraNegocioException("Id não encontrado"));
+        Tarefa tarefa = buscarTarefaPorId(id);
+
+        if (tarefa.getStatus() == Status.FINALIZADO) {
+            throw new RegraNegocioException("Tarefa já finalizada");
+        }
 
         tarefa.setStatus(Status.FINALIZADO);
         tarefa.setDataDeAtualizacao(LocalDate.now());
-
         return repository.save(tarefa);
     }
 
     @Override
     public Tarefa reabirTarefa(Long id) {
-        Tarefa tarefa = repository.findById(id)
-                .orElseThrow(() -> new RegraNegocioException("Id não encontrado"));
-
+        Tarefa tarefa = buscarTarefaPorId(id);
+        if (tarefa.getStatus() == Status.PENDENTE) {
+            throw new RegraNegocioException("Tarefa ainda está pendente");
+        }
         tarefa.setStatus(Status.PENDENTE);
         tarefa.setDataDeAtualizacao(LocalDate.now());
 
@@ -59,9 +66,34 @@ public class TarefaServiceImpl implements TarefaService {
     }
 
     @Override
+    public Tarefa atualizarTarefa(Long id, Tarefa tarefaAtualizada) {
+        Tarefa tarefa = buscarTarefaPorId(id);
+        merge( tarefaAtualizada, tarefa);
+        tarefa.setDataDeAtualizacao(LocalDate.now());
+        return repository.save(tarefa);
+    }
+
+    @Override
     public void deleteTarefa(Long id) {
-        Tarefa tarefa = repository.findById(id)
-                .orElseThrow(() -> new RegraNegocioException("Id não encontrado"));
+        Tarefa tarefa = buscarTarefaPorId(id);
         repository.delete(tarefa);
     }
+
+    private void merge(Tarefa source, Tarefa target) {
+        BeanUtils.copyProperties(source, target, getNullPropertyNames(source));
+    }
+
+    private String[] getNullPropertyNames(Object source) {
+        final BeanWrapper src = new BeanWrapperImpl(source);
+        java.beans.PropertyDescriptor[] pds = src.getPropertyDescriptors();
+
+        Set<String> emptyNames = new HashSet<>();
+        for (java.beans.PropertyDescriptor pd : pds) {
+            Object srcValue = src.getPropertyValue(pd.getName());
+            if (srcValue == null) emptyNames.add(pd.getName());
+        }
+        String[] result = new String[emptyNames.size()];
+        return emptyNames.toArray(result);
+    }
+
 }

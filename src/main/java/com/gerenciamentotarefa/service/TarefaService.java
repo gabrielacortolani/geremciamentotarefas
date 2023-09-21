@@ -15,5 +15,7 @@ public interface TarefaService {
 
     Tarefa reabirTarefa(Long id);
 
+    Tarefa atualizarTarefa(Long id, Tarefa tarefaAtualizada);
+
     void deleteTarefa(Long id);
 }
